@@ -6,6 +6,8 @@ import AuthorList from './components/Author.js'
 import BookList from "./components/Books"
 import AuthorBookList from "./components/AuthorBook"
 import {HashRouter, Route, Link, Switch, Redirect, BrowserRouter} from 'react-router-dom'
+import LoginForm from "./components/Auth";
+import Cookies from "universal-cookie/es6";
 
 const NotFound404 = ({ location }) => {
     return (
@@ -20,33 +22,79 @@ class App extends React.Component {
   constructor(props) {
     super(props)
 
-    const author1 = {id: 1, first_name: 'Грин', birthday_year: 1880}
-    const author2 = {id: 2, first_name: 'Пушкин', birthday_year: 1799}
-    const authors = [author1, author2]
-
-    const book1 =  {id: 1, name: 'Алые паруса', author: author1}
-    const book2 =  {id: 2, name: 'Золотая цепь', author: author1}
-    const book3 =  {id: 3, name: 'Пиковая дама', author: author2}
-    const book4 =  {id: 4, name: 'Капитанская дочка', author: author2}
-    const books = [book1, book2, book3, book4]
-
     this.state = {
-      'authors': authors,
-      'books': books
+        'authors': [],
+        'books': [],
+        'token': ''
     }
   }
 
-  // componentDidMount() {
-  //   axios.get('http://127.0.0.1:8000/api/authors')
-  //       .then(response => {
-  //         const authors = response.data
-  //           this.setState(
-  //             {
-  //               'authors': authors
-  //             }
-  //           )
-  //       }).catch(error => console.log(error))
-  // }
+  set_token(token) {
+      const cookies = new Cookies()
+      cookies.set('token', token)
+      localStorage.setItem('token', token)
+      this.setState({'token': token}, () => this.load_data())
+  }
+
+  is_authenticated() {
+      return this.state.token != ''
+  }
+
+  logout () {
+      this.set_token('')
+  }
+
+  get_token_from_storage() {
+      const cookies = new Cookies()
+      // const token = cookies.get('token')
+      const token = localStorage.getItem('token')
+      this.setState({'token': token}, () => this.load_data())
+  }
+
+  get_token(login, password) {
+      axios.post('http://127.0.0.1:8000/api-token-auth/', {username: login, password: password})
+          .then(response => {
+              this.set_token(response.data['token'])
+          }).catch(error => alert('Неверный пароль'))
+  }
+
+  get_headers() {
+      let headers = {
+          'Content-Type': 'application/json',
+      }
+      if (this.is_authenticated())
+      {
+          headers['Authorization'] = 'Token' + this.state.token
+      }
+      return headers
+  }
+
+  load_data() {
+      const headers = this.get_headers()
+      axios.get('http://127.0.0.1:8000/api/authors', {headers})
+          .then(response => {
+              const authors = response.data
+                  this.setState(
+                      {
+                          'authors': authors['results']
+                      }
+                  )
+              }).catch(error => console.log(error))
+
+      axios.get('http://127.0.0.1:8000/api/books', {headers})
+          .then(response => {
+              const books = response.data
+                  this.setState(
+                      {
+                          'books': books['results']
+                      }
+                  )
+              }).catch(error => console.log(error))
+  }
+
+  componentDidMount() {
+      this.get_token_from_storage()
+  }
 
   render() {
     return (
@@ -60,12 +108,17 @@ class App extends React.Component {
                       <li>
                           <Link to='/books'>Books</Link>
                       </li>
+                      <li>
+                          {this.is_authenticated() ? <button onClick={() => this.logout()}>Logout</button> : <Link to='/login'>Login</Link> }
+
+                      </li>
                   </ul>
               </nav>
               <Switch>
                   <Route exact path='/' component={() => <AuthorList authors={this.state.authors} />} />
                   <Route exact path='/books' component={() => <BookList items={this.state.books} />} />
                   <Route exact path='/author/:id' component={() => <AuthorBookList items={this.state.books} />} />
+                  <Route exact path='/login' component={() => <LoginForm get_token={(login, password) => this.get_token(login, password)}/>} />
                   <Redirect from='/authors' to='/'/>
                   <Route component={NotFound404}/>
               </Switch>
