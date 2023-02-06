@@ -1,3 +1,4 @@
+from rest_framework import generics
 from rest_framework.decorators import action
 from rest_framework.generics import CreateAPIView, ListAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -5,7 +6,7 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ViewSet
 from .models import Author, Biography, Book, Article
-from .serializers import AuthorModelSerializer, BiographyModelSerializer, BookModelSerializer, ArticleModelSerializer
+from .serializers import AuthorModelSerializer, AuthorModelSerializer2, BiographyModelSerializer, BookModelSerializer, ArticleModelSerializer
 from rest_framework.views import APIView
 from rest_framework.pagination import LimitOffsetPagination
 
@@ -38,12 +39,13 @@ class ArticleModelViewSet(ModelViewSet):
     serializer_class = ArticleModelSerializer
 
 
-class MyAPIView(ViewSet):
-    def list(self, request):
-        authors = Author.objects.all()
-        serializer = AuthorModelSerializer(authors, many=True)
-        return Response(serializer.data)
+class MyAPIView(generics.ListAPIView):
+    queryset = Author.objects.all()
+    serializer = AuthorModelSerializer
 
-    @action(detail=False, methods=['get'])
-    def babayka(self, request):
-        return Response({'data': 'RATATA'})
+    def get_serializer_class(self):
+        if self.request.version == '1':
+            return AuthorModelSerializer
+        return AuthorModelSerializer2
+
+
